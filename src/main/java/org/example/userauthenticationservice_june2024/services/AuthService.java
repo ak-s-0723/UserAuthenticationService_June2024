@@ -1,5 +1,7 @@
 package org.example.userauthenticationservice_june2024.services;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.MacAlgorithm;
 import org.antlr.v4.runtime.misc.Pair;
@@ -32,6 +34,9 @@ public class AuthService implements IAuthService {
 
     @Autowired
     private BCryptPasswordEncoder bCryptPasswordEncoder;
+
+    @Autowired
+    private SecretKey secretKey;
 
     public User signup(String email,String password) {
         Optional<User> optionalUser = userRepo.findByEmail(email);
@@ -76,8 +81,8 @@ public class AuthService implements IAuthService {
         claims.put("exp",nowInMillis+1000000);
 
         //byte[] content = message.getBytes(StandardCharsets.UTF_8);
-        MacAlgorithm algorithm = Jwts.SIG.HS256;
-        SecretKey secretKey = algorithm.key().build();
+        //MacAlgorithm algorithm = Jwts.SIG.HS256;
+        //SecretKey secretKey = algorithm.key().build();
         //String token = Jwts.builder().content(content).signWith(secretKey).compact();
         String token = Jwts.builder().claims(claims).signWith(secretKey).compact();
 
@@ -92,7 +97,67 @@ public class AuthService implements IAuthService {
 
         return new Pair<User,MultiValueMap<String,String>>(user,headers);
     }
+
+    public Boolean validateToken(String token,Long userId) {
+        System.out.println(token);
+        Optional<Session> optionalSession = sessionRepo.findByTokenAndUser_Id(token,userId);
+        if(optionalSession.isEmpty()) {
+            System.out.println("Token mismatch");
+            return false;
+        }
+
+        Session session = optionalSession.get();
+        String storedToken = session.getToken();
+
+
+        JwtParser jwtParser = Jwts.parser().verifyWith(secretKey).build();
+        Claims claims = jwtParser.parseSignedClaims(storedToken).getPayload();
+
+        Long tokenExpiry = (Long)claims.get("exp");
+
+        Long currentTime = System.currentTimeMillis();
+
+        System.out.println(tokenExpiry);
+        System.out.println(currentTime);
+
+        if(currentTime > tokenExpiry) {
+            System.out.println(
+                    "Token is expired");
+            //set state to expired in my DB
+            return false;
+        }
+
+
+        //Till this point, it's good to go
+
+        User user = userRepo.findById(userId).get();
+        String email = user.getEmail();
+        String tokenEmail = (String)claims.get("email");
+        if(!email.equals(tokenEmail)) {
+            System.out.println("email mismatch");
+            return false;
+        }
+
+        return true;
+    }
+
+//    public String generateRefreshToken(String token) {
+//        Session session = sessionRepo.findByToken(token).get();
+//        User user = session.getUser();
+//
+//        Map<String,Object> claims = new HashMap<>();
+//        claims.put("user_id__",user.getId());
+//        claims.put("roles",user.getRoles());
+//        claims.put("email",user.getEmail());
+//        long nowInMillis = System.currentTimeMillis();
+//        claims.put("iat",nowInMillis);
+//        claims.put("exp",nowInMillis+1000000);
+//
+//
+//    }
 }
+
+
 
 
 

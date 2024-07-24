@@ -2,6 +2,7 @@ package org.example.userauthenticationservice_june2024.controllers;
 
 import org.antlr.v4.runtime.misc.Pair;
 import org.example.userauthenticationservice_june2024.dtos.*;
+import org.example.userauthenticationservice_june2024.exceptions.InvalidTokenException;
 import org.example.userauthenticationservice_june2024.exceptions.UserAlreadyExistsException;
 import org.example.userauthenticationservice_june2024.models.User;
 import org.example.userauthenticationservice_june2024.services.IAuthService;
@@ -55,6 +56,21 @@ public class AuthController {
 
         return new ResponseEntity<>(from(user),userWithHeaders.b,HttpStatus.OK);
     }
+
+    @PostMapping("/validate")
+     public ResponseEntity<Boolean> validateToken(@RequestBody ValidateTokenRequestDto validateTokenRequestDto) {
+        try {
+            System.out.println(validateTokenRequestDto.getToken());
+            Boolean response = authService.validateToken(validateTokenRequestDto.getToken(), validateTokenRequestDto.getUserId());
+            if (response == false) {
+                throw new InvalidTokenException("Either Token is stale or invalid");
+            }
+            return new ResponseEntity<>(response,HttpStatus.OK);
+
+        }catch(InvalidTokenException exception) {
+            return new ResponseEntity<>(null,HttpStatus.BAD_REQUEST);
+        }
+     }
 
     public ResponseEntity<Boolean> logout(@RequestBody LogoutRequestDto logoutRequestDto) {
         return null;
